@@ -1,3 +1,4 @@
+import sys
 import time
 from builtins import str
 
@@ -17,15 +18,25 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from Pytorch.loading_saving import save_whole_nn, load_whole_nn
 
-LOAD = True
-BUFFER_SIZE = int(1e5)  # replay buffer size
+# experience replay and fixed Q targets (soft and hard update) are always active
+
+# Hyperparameters
+SOFT_UPDATE = False      # if true updates q targets softly, otherwise every hard with UPDATE_TARGET_EVERY
+UPDATE_TARGET_EVERY = 20 # how often to do the hard update for targets
+DOUBLE_Q= False          # applying double q learning
+PRIORITIZED_EXP_REPLAY= False          # applying prioritized experience replay
+BUFFER_SIZE = 100000    # replay buffer size
 BATCH_SIZE = 64         # minibatch size
 GAMMA = 0.99            # discount factor
-TAU = 1e-3              # for soft update of target parameters
-LR = 5e-4               # learning rate
+TAU = 0.001             # for soft update of target parameters
+LR = 0.0005             # learning rate
 UPDATE_EVERY = 4        # how often to update the network
+
+# Statistics
+number_episodes_til_solved=-1
+running_time=-1
+
 
 # use gpu if available else cpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -47,6 +58,16 @@ number_actions=env.action_space.n
 
 
 print(state_dimension,number_actions)
+
+
+def print_stats_to_file(file_name):
+    original_stdout = sys.stdout
+    with open(file_name, 'a') as f:
+        sys.stdout = f # Change the standard output to the file we created.
+        print('Running time:\t',running_time)
+        print('# episodes til solved:\t',number_episodes_til_solved)
+        sys.stdout = original_stdout # Reset the standard output to its original value
+
 
 
 def state_dim_to_int(state_dimension):
@@ -72,7 +93,6 @@ class QNetwork(nn.Module):
 class Agent():
 
     def __init__(self, state_shape, number_actions,hidden_layers,state_dict_local,state_dict_target, seed):
-
         state_dimension = state_dim_to_int(state_shape)
         self.state_dimension = state_dimension
         self.number_actions = number_actions
@@ -98,39 +118,55 @@ class Agent():
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
         self.memory.add(state, action, reward, next_state, done)
-
         # Learn every UPDATE_EVERY time steps.
-        self.t_step = (self.t_step + 1) % UPDATE_EVERY
-        if self.t_step == 0:
+        self.t_step = (self.t_step + 1)%(UPDATE_EVERY*UPDATE_TARGET_EVERY)
+        if (self.t_step% UPDATE_EVERY) == 0:
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > BATCH_SIZE:
                 experiences = self.memory.sample()
                 self.learn(experiences, GAMMA)
 
     def act(self, state, eps=0.):
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-        # set evaluation mode
-        self.qnetwork_local.eval()
-        # for evaluation no grad bc its faster
-        with torch.no_grad():
-            action_values = self.qnetwork_local(state)
-        # set training mode
-        self.qnetwork_local.train()
-
         # Epsilon-greedy action selection
         if random.random() > eps:
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+            # set evaluation mode
+            self.qnetwork_local.eval()
+            # for evaluation no grad bc its faster
+            with torch.no_grad():
+                # compute action values
+                action_values = self.qnetwork_local(state)
+            # set training mode
+            self.qnetwork_local.train()
+            # return best action
             return np.argmax(action_values.cpu().data.numpy())
         else:
             return random.choice(np.arange(self.number_actions))
 
     def learn(self, experiences, gamma):
         states, actions, rewards, next_states, dones = experiences
+        if(DOUBLE_Q):
+            # set evaluation mode
+            self.qnetwork_local.eval()
+            with torch.no_grad():
+                # compute action values with local network
+                action_values = self.qnetwork_local(next_states)
+                # determine best action
+                best_actions = action_values.argmax(1)
+                # compute q targets with target network and choose best action
+                Q_targets_next=torch.tensor([self.qnetwork_target(next_state)[int(next_action)] for next_action,next_state in zip(best_actions,next_states)]).unsqueeze(1)
+                # print(action_values[0],best_actions[0],"\t",self.qnetwork_target(next_states[0]),Q_targets_next[0])
+            # set training mode
+            self.qnetwork_local.train()
+            # # Get the best action for next states from the local network
+            # best_actions = [self.qnetwork_local.forward(next_state).detach().argmax() for next_state in next_states]
+            # # Put the next state in target network and choose the previously computed best action (Double Q Learning)
+            # Q_targets_next=torch.tensor([self.qnetwork_target(next_state).detach()[int(next_action)] for next_action,next_state in zip(best_actions,next_states)]).unsqueeze(1)
+        else:
+            Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
 
-        # Get max predicted Q values (for next states) from target model
-        Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
         # Compute Q targets for current states
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
-
         # Get expected Q values from local model
         Q_expected = self.qnetwork_local(states).gather(1, actions)
 
@@ -141,21 +177,29 @@ class Agent():
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-
-        self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)
+        if SOFT_UPDATE:
+            self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)
+        elif(self.t_step% UPDATE_TARGET_EVERY) == 0:
+            self.hard_update(self.qnetwork_local, self.qnetwork_target)
 
     def soft_update(self, local_model, target_model, tau):
-        """Soft update model parameters.
-        θ_target = τ*θ_local + (1 - τ)*θ_target
-
-        Params
-        ======
-            local_model (PyTorch model): weights will be copied from
-            target_model (PyTorch model): weights will be copied to
-            tau (float): interpolation parameter
-        """
+        # Soft update model parameters.
+        # θ_target = τ*θ_local + (1 - τ)*θ_target
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau*local_param.data + (1.0-tau)*target_param.data)
+
+    def hard_update(self, local_model, target_model):
+        for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+            target_param.data.copy_(local_param.data)
+
+class memory:
+    def __init__(self, state, action, reward, next_state,done,priority):
+        self.state=state
+        self.action=action
+        self.reward = reward
+        self.next_state=next_state
+        self.done=done
+        self.priority=priority
 
 
 class ReplayBuffer:
@@ -189,15 +233,6 @@ class ReplayBuffer:
 
 
 def dqn(agent,n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
-    """
-    Params
-    ======
-        n_episodes (int): maximum number of training episodes
-        max_t (int): maximum number of timesteps per episode
-        eps_start (float): starting value of epsilon, for epsilon-greedy action selection
-        eps_end (float): minimum value of epsilon
-        eps_decay (float): multiplicative factor (per episode) for decreasing epsilon
-    """
     scores = []                        # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start                    # initialize epsilon
@@ -224,28 +259,61 @@ def dqn(agent,n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_deca
         if np.mean(scores_window)>=200.0:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode-100, np.mean(scores_window)))
             torch.save(agent.qnetwork_local.state_dict(), 'checkpoint.pth')
+            number_episodes_til_solved=i_episode-100
             break
     return scores
 
+def test_parameters(SOFT_UPDATE_values,UPDATE_TARGET_EVERY_values,DOUBLE_Q_values,PRIORITIZED_EXP_REPLAY_values,
+                    BUFFER_SIZE_values,BATCH_SIZE_values,GAMMA_values,TAU_values,LR_values,UPDATE_EVERY_values,):
+    global env,start_time,running_timeLOAD,SOFT_UPDATE,UPDATE_TARGET_EVERY,DOUBLE_Q,PRIORITIZED_EXP_REPLAY,BUFFER_SIZE,\
+        BATCH_SIZE,GAMMA,TAU,LR,UPDATE_EVERY
+    for s in SOFT_UPDATE_values:
+        SOFT_UPDATE=s
+        for ute in UPDATE_TARGET_EVERY_values:
+            UPDATE_TARGET_EVERY=ute
+            for dq in DOUBLE_Q_values:
+                DOUBLE_Q=dq
+                for per in PRIORITIZED_EXP_REPLAY_values:
+                    PRIORITIZED_EXP_REPLAY=per
+                    for bf in BUFFER_SIZE_values:
+                        BUFFER_SIZE=bf
+                        for bs in BATCH_SIZE_values:
+                            BATCH_SIZE=bs
+                            for g in GAMMA_values:
+                                GAMMA=g
+                                for t in TAU_values:
+                                    TAU=t
+                                    for lr in LR_values:
+                                        LR=lr
+                                        for ue in UPDATE_EVERY_values:
+                                            UPDATE_EVERY=ue
+                                            agent =Agent(state_shape=state_dimension, number_actions=number_actions,
+                                                         hidden_layers=hidden_layers,state_dict_local=None,state_dict_target=None, seed=0)
+                                            start_time = time.time()
+                                            dqn(agent)
+                                            running_time = time.time()-start_time
+                                            print_stats_to_file("Parameters_test.txt")
+                                            env.reset()
 
-agent =Agent(state_shape=state_dimension, number_actions=number_actions,hidden_layers=hidden_layers,state_dict_local=None,state_dict_target=None, seed=0)
-if LOAD:
-    state_dict_local = torch.load(problem_name+"_qnetwork_local.pth")
-    state_dict_target = torch.load(problem_name+"_qnetwork_target.pth")
-    agent = Agent(state_shape=state_dimension, number_actions=number_actions,hidden_layers=hidden_layers,state_dict_local=state_dict_local, state_dict_target=state_dict_target, seed=0)
-start_time = time.time()
-scores = dqn(agent)
-print("Time for learning:",(time.time()-start_time))
-# save model
-if not LOAD:
-    torch.save(agent.qnetwork_local.state_dict(), problem_name+"_qnetwork_local.pth")
-    torch.save(agent.qnetwork_target.state_dict(), problem_name+"_qnetwork_target.pth")
 
-
-# plot the scores
-fig = plt.figure()
-ax = fig.add_subplot(111)
-plt.plot(np.arange(len(scores)), scores)
-plt.ylabel('Score')
-plt.xlabel('Episode #')
-plt.show()
+def start_agent(LOAD,filename,PLOT):
+    agent =Agent(state_shape=state_dimension, number_actions=number_actions,hidden_layers=hidden_layers,state_dict_local=None,state_dict_target=None, seed=0)
+    if LOAD:
+        state_dict_local = torch.load(filename+"_qnetwork_local.pth")
+        state_dict_target = torch.load(filename+"_qnetwork_target.pth")
+        agent = Agent(state_shape=state_dimension, number_actions=number_actions,hidden_layers=hidden_layers,state_dict_local=state_dict_local, state_dict_target=state_dict_target, seed=0)
+    start_time = time.time()
+    scores = dqn(agent)
+    print("Time for learning:",(time.time()-start_time))
+    # save model
+    if not LOAD:
+        torch.save(agent.qnetwork_local.state_dict(), filename+"_qnetwork_local.pth")
+        torch.save(agent.qnetwork_target.state_dict(), filename+"_qnetwork_target.pth")
+    if PLOT:
+        # plot the scores
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.plot(np.arange(len(scores)), scores)
+        plt.ylabel('Score')
+        plt.xlabel('Episode #')
+        plt.show()
