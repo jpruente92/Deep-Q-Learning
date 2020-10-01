@@ -4,6 +4,8 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+def foo():
+    pass
 
 class QNetwork_pytorch(torch.nn.Module):
 
@@ -14,7 +16,7 @@ class QNetwork_pytorch(torch.nn.Module):
         layer_sizes = zip(hidden_layers[:-1], hidden_layers[1:])
         self.hidden_layers.extend([nn.Linear(h1, h2) for h1, h2 in layer_sizes])
         self.output = nn.Linear(hidden_layers[-1], number_actions)
-        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
+        self.optimizer = optim.Adam(self.parameters(), lr=LR)
         self.device=device
          # load weights and biases if given
         if LOAD:
@@ -28,16 +30,18 @@ class QNetwork_pytorch(torch.nn.Module):
         return self.output(x)
 
     def evaluate(self, state):
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        state = torch.from_numpy(state).float().to(self.device)
         # set evaluation mode
-        self.qnetwork_local.eval()
+        self.eval()
         # for evaluation no grad bc its faster
         with torch.no_grad():
             # compute action values
             action_values = self.forward(state)
             # set training mode
-        self.qnetwork_local.train()
+        self.train()
         return action_values
+
+
 
     def save(self,filename):
         torch.save(self.state_dict(), filename+"_qnetwork_local.pth")
