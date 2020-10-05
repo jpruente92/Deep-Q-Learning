@@ -1,0 +1,26 @@
+Algorithm:
+     The used algorithm is a variant of Q_learning. It uses fixed targets, which means that there are two neural networks for approximating the Q-values.
+     The local network is used by the agent to compute the Q-values for acting. The target network computes Q-values for the next state in the learning process.
+     Just the local network is trained with the TD-error computed with the SARSAmax formula. The target network is either soft updated every time the local network is trained,
+     which means that the weights of the target network are set to a convex combination of the weihts of both networks with parameter TAU. The other option is that the values
+     from the local network are copied to the target network all UPDATE_TARGET_EVERY steps. This was called hard update. The algorithm uses an experience replay buffer, in which
+     the experience from the environment is stored. One element of experience consists of a state, an action, the resulting state, the resulting reward and whether or not it is a
+     terminal state. Every time the local network is trained, it samples a minibatch from the replay buffer with equal probability and uses it for computing TD-errors for learning.
+     The parameter DOUBLE_Q controls, whether Double Q learning is used or not. If Double Q learning is used, the target value is computed by first determining the best action with
+     the local network and afterwards choosing the corresponding value from the target network. This reduces the number of learning steps, but increases the running time due to
+     additional evaluations. The parameter PRIORITIZED_EXP_REPLAY controls, whether prioritized experience replay is used or not. If it is true, we save a priority value for every
+     element in the replay buffer. This is used as a weight in the sampling process. Because sampling with weights is very time consuming for large number of elements in the
+     replay buffer, we used in this case the sum tree queue sata structure, which consists of a queue that stores all nodes and a sum tree. The sum tree is used for sampling
+     efficiently and the queue for understanding, which node to delete, when the buffersize is reached. The idea of using sum trees comes form the paper "PRIORITIZED EXPERIENCE REPLAY"
+     by Schaul et al.. To neutralize a bias that is introduced by the weighted sampling the TD-errors are multiplied with an importance sampling weight before training the network.
+     The parameter B controls how much of this weight is used and B is increased over time. For new experiences, the priority is set to the maximum priority that is observed so far.
+     After an experience is used, the priority is updated to the absolute value of the TD-error.
+
+Details:
+
+Observations:
+     - Double Q Learning reduces the number of learning steps, but increases the running time
+
+Future Improvements:
+    - Use also tensorflow for the Deep Learning and compare the results
+

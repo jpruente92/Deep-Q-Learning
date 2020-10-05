@@ -19,6 +19,10 @@ class Sum_tree_queue():
         self.queue.append(new_node)
         self.sum_tree.add(new_node)
 
+    def __len__(self):
+        return len(self.queue)
+
+
 
 class Sum_tree():
     def __init__(self):
@@ -96,12 +100,20 @@ class Sum_tree():
             if(node.right is not None):
                 self.add(node.right)
 
+    def update_priority(self,node,priority):
+        diff = node.priority-priority
+        node.priority=priority
+        while node is not None:
+            node.sum-=diff
+            node=node.father
+
 
     def sample_values(self,replace,batch_size):
         random_number = random.random()
         node =self.root
         total_sum=self.root.sum
-        samples=[]
+        nodes=[]
+        probabilities=[]
         indices=[]
         for x in range(batch_size):
             while True:
@@ -116,9 +128,8 @@ class Sum_tree():
                         node=node.right
                         random_number-=((sum_left+node.priority)/total_sum)
                     else:
-                        samples.append(node.value)
-
-
+                        nodes.append(node)
+                        probabilities.append(node.priority/total_sum)
                         break
                 # otherwise the node has to be ignored
                 else:
@@ -130,7 +141,7 @@ class Sum_tree():
                         # change probabilities according to the removal
                         total_sum-=node.priority
                         indices.append(node.index)
-        return samples
+        return nodes,probabilities
 
 
     def print(self,node):

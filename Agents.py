@@ -2,8 +2,7 @@ import time
 
 import numpy as np
 import random
-from collections import deque
-
+from collections import deque, namedtuple
 
 from Neural_networks import QNetwork_pytorch
 
@@ -12,12 +11,16 @@ import torch.nn.functional as F
 
 # experience replay and fixed Q targets (soft and hard update) are always active
 # Hyperparameters
-LOAD = False            # loading neural networks from file
+from Replay_buffer import ReplayBuffer
+from Sum_tree import Sum_tree_queue
+
+LOAD = True            # loading neural networks from file
 PY_TORCH = True         # if true pytorch else tensorflow
 SOFT_UPDATE = True      # if true updates q targets softly, otherwise every hard with UPDATE_TARGET_EVERY
 UPDATE_TARGET_EVERY = 20 # how often to do the hard update for targets
-DOUBLE_Q= False          # applying double q learning
-PRIORITIZED_EXP_REPLAY= True          # applying prioritized experience replay
+DOUBLE_Q= True          # applying double q learning
+PRIORITIZED_EXP_REPLAY= False          # applying prioritized experience replay
+A=0.6                   # parameter for prioritized experience replay
 BUFFER_SIZE = 10000    # replay buffer size
 BATCH_SIZE = 64         # minibatch size
 GAMMA = 0.99            # discount factor
@@ -44,28 +47,28 @@ class Agent_py_torch():
         self.number_actions = number_actions
         self.hidden_layers = hidden_layers
         self.seed = random.seed(seed)
-        self.max_priority=1
+        self.max_priority=1000
         # use gpu if available else cpu
         self.device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.qnetwork_local = QNetwork_pytorch(state_dimension, number_actions, hidden_layers, seed, LR, LOAD, filename_local, self.device, self.profile).to(self.device)
         self.qnetwork_target = QNetwork_pytorch(state_dimension, number_actions, hidden_layers, seed, LR, LOAD, filename_target, self.device, self.profile).to(self.device)
         # Replay memory for sampling from former experiences
-        self.memory = ReplayBuffer(number_actions, BUFFER_SIZE, BATCH_SIZE, seed, profile)
+        self.memory = ReplayBuffer(number_actions, BUFFER_SIZE, BATCH_SIZE, seed, profile,PRIORITIZED_EXP_REPLAY)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
 
 
     # doing one step in the environment: saving experience in replay buffer and learn
-    def step(self, state, action, reward, next_state, done,A,B):
+    def step(self, state, action, reward, next_state, done,B):
         # Save experience in replay memory with maximum priority
-        self.memory.add(state, action, reward, next_state, done,self.max_priority)
+        self.memory.add(state, action, reward, next_state, done,self.max_priority,A)
         # Learn every UPDATE_EVERY time steps
         self.t_step = (self.t_step + 1)%(UPDATE_EVERY*UPDATE_TARGET_EVERY)
         if (self.t_step% UPDATE_EVERY) == 0:
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > BATCH_SIZE:
-                experiences,probabilities = self.memory.sample(A)
-                self.learn(experiences,probabilities, GAMMA,B)
+                nodes,probabilities = self.memory.sample()
+                self.learn(nodes,probabilities, GAMMA,B)
 
     # returns the action following the epsilon-greedy policy
     def act(self, state, eps=0.):
@@ -93,10 +96,8 @@ class Agent_py_torch():
             best_actions = action_values.argmax(1)
             # compute q targets with target network and choose best action
             Q_targets_next=torch.tensor([self.qnetwork_target.evaluate(next_state,True)[int(next_action)] for next_action,next_state in zip(best_actions,next_states)]).unsqueeze(1)
-            # Q_targets_next=np.array([self.qnetwork_target.evaluate(next_state)[int(next_action)] for next_action,next_state in zip(best_actions,next_states)])
         else:
             Q_targets_next = self.qnetwork_target.evaluate(next_states,True).detach().max(1)[0].unsqueeze(1)
-            # Q_targets_next = self.qnetwork_target.evaluate(next_states).max(1)[0]
         # Compute Q targets for current states
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
         # Get expected Q values from local model
@@ -107,19 +108,23 @@ class Agent_py_torch():
         if PRIORITIZED_EXP_REPLAY:
             # update priorities
             td_errors = Q_targets-Q_expected
-            for i, sample in enumerate(samples):
+            for i, node in enumerate(samples):
                 # set priority of the given samples, small positive priority has to be guaranteed
                 priority=float(max(abs(td_errors[i]),0.01))
-                sample.priority=priority
+                self.memory.memory.sum_tree.update_priority(node,priority)
                 # update max priority
                 self.max_priority=max(priority,self.max_priority)
             self.profile.total_time_updating_priorities+=(time.time() - start_time_update)
             start_time_isw=time.time()
-            # multiply Q-targets with importance-sampling weight
+            # multiply Q-targets and Q expected with importance-sampling weight
+            max_importance_sampling_weight=0
             for i,prob in enumerate(probabilities):
                 importance_sampling_weight = (1.0/len(self.memory)/probabilities[i])**B
-                # print ("\tios",importance_sampling_weight)
-                Q_targets[i]*=importance_sampling_weight
+                max_importance_sampling_weight=max(importance_sampling_weight,max_importance_sampling_weight)
+            for i,prob in enumerate(probabilities):
+                # scaling with maximum weight for stability reasons
+                Q_targets[i]*=importance_sampling_weight/max_importance_sampling_weight
+                Q_expected[i]*=importance_sampling_weight/max_importance_sampling_weight
             self.profile.total_time_introducing_isw+=(time.time() - start_time_isw)
 
 
@@ -154,6 +159,8 @@ class Agent_py_torch():
 
     def samples_to_environment_values(self,samples):
         start_time=time.time()
+        if PRIORITIZED_EXP_REPLAY:
+            samples = [node.value for node in samples]
         states = torch.from_numpy(np.vstack([e.state for e in samples if e is not None])).float().to(self.device)
         actions = torch.from_numpy(np.vstack([e.action for e in samples if e is not None])).long().to(self.device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in samples if e is not None])).float().to(self.device)
@@ -162,44 +169,6 @@ class Agent_py_torch():
         self.profile.total_time_samples_to_environment_values+=(time.time() - start_time)
         return states,actions,rewards,next_states,dones
 
-class Experience:
-    def __init__(self, state, action, reward, next_state,done,priority):
-        self.state=state
-        self.action=action
-        self.reward = reward
-        self.next_state=next_state
-        self.done=done
-        self.priority=priority
 
 
-class ReplayBuffer:
 
-    def __init__(self, number_actions, buffer_size, batch_size, seed, profile):
-        self.number_actions = number_actions
-        self.memory = deque(maxlen=buffer_size)
-        self.batch_size = batch_size
-        self.seed = random.seed(seed)
-        self.profile = profile
-
-    def add(self, state, action, reward, next_state, done,priority):
-        new_experience = Experience(state, action, reward, next_state, done,priority)
-        self.memory.append(new_experience)
-
-    def sample(self,A):
-        start_time=time.time()
-        self.profile.total_number_sampling_calls+=1
-        if PRIORITIZED_EXP_REPLAY:
-            priorities=[mem.priority**A for mem in self.memory]
-            mysum= sum(priorities)
-            probabilities=[p/mysum for p in priorities]
-            draw = np.random.choice(len(probabilities), self.batch_size,replace=False,p=probabilities)
-            samples=[self.memory[i] for i in draw]
-            probabilities_of_samples=[probabilities[i] for i in draw]
-        else:
-            samples = random.sample(self.memory, k=self.batch_size)
-            probabilities_of_samples=[]
-        self.profile.total_time_sampling+=(time.time() - start_time)
-        return samples, probabilities_of_samples
-
-    def __len__(self):
-        return len(self.memory)
