@@ -6,22 +6,24 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+from Hyperparameter import Hyperparameters
 
 
-class QNetwork_pytorch(torch.nn.Module):
+class QNetwork(torch.nn.Module):
 
-    def __init__(self, state_dimension, number_actions, hidden_layers, seed, LR, LOAD, filename, device, profile):
-        super(QNetwork_pytorch, self).__init__()
+    def __init__(self, state_dimension, number_actions, seed, filename, device, profile,param):
+        super(QNetwork, self).__init__()
+        self.param = param
         self.profile=profile
         self.seed = torch.manual_seed(seed)
-        self.hidden_layers = nn.ModuleList([nn.Linear(state_dimension, hidden_layers[0])])
-        layer_sizes = zip(hidden_layers[:-1], hidden_layers[1:])
+        self.hidden_layers = nn.ModuleList([nn.Linear(state_dimension, self.param.hidden_layers[0])])
+        layer_sizes = zip(self.param.hidden_layers[:-1], self.param.hidden_layers[1:])
         self.hidden_layers.extend([nn.Linear(h1, h2) for h1, h2 in layer_sizes])
-        self.output = nn.Linear(hidden_layers[-1], number_actions)
-        self.optimizer = optim.Adam(self.parameters(), lr=LR)
+        self.output = nn.Linear(self.param.hidden_layers[-1], number_actions)
+        self.optimizer = optim.Adam(self.parameters(), lr=self.param.LR)
         self.device=device
-         # load weights and biases if given
-        if LOAD:
+        # load weights and biases if given
+        if self.param.LOAD:
             self.load_state_dict(torch.load(filename))
             print("Values loaded")
 
@@ -51,31 +53,8 @@ class QNetwork_pytorch(torch.nn.Module):
 
 
     def save(self,filename):
-        torch.save(self.state_dict(), filename+"_qnetwork_local.pth")
+        torch.save(self.state_dict(), filename)
 
-class QNetwork_tensorflow():
-    def __init__(self, state_dimension, number_actions, hidden_layers, seed,LR,LOAD,filename,profile):
-        self.seed = seed
-        if LOAD:
-            model =tf.keras.models.load_model(filename)
-            print("Values loaded")
-        else:
-            # create model
-            self.model= tf.keras.models.Sequential()
-            # Input Layer: Flatten layer for input transformation
-            self.model.add(tf.keras.layers.Flatten())
-            # hidden layers
-            for hl_size in hidden_layers:
-                self.model.add(tf.keras.layers.Dense(hl_size, activation=tf.nn.relu))
-            # output layer
-            self.model.add(tf.keras.layers.Dense(number_actions, activation=tf.nn.linear))
-            # specify optimizer and loss
-            model.compile(optimizer='adam',loss=tf.keras.losses.sparse_categorical_crossentropy,metrics=['accuracy'])
 
-    def evaluate(self, state):
-        return self.model.predict([state])
-
-    def save(self,filename):
-        self.model.save(filename)
 
 

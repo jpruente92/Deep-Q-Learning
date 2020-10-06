@@ -9,4 +9,7 @@ Required packages:
     - pytorch
     - unityagents # if solving unity environment
 
+Required files:
+    - the unity exe file has to be inside this folder; here is an environment called "Bananas.exe" included
+
 

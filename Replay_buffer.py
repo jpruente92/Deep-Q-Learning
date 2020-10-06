@@ -2,20 +2,22 @@ import random
 import time
 from collections import deque, namedtuple
 
+from Hyperparameter import Hyperparameters
 from Sum_tree import Sum_tree_queue
 
 
 class ReplayBuffer:
 
-    def __init__(self, number_actions, buffer_size, batch_size, seed, profile,PRIORITIZED_EXP_REPLAY):
+    def __init__(self, number_actions, seed, profile,param):
+        self.param = param
         self.number_actions = number_actions
-        self.PRIORITIZED_EXP_REPLAY=PRIORITIZED_EXP_REPLAY
-        if PRIORITIZED_EXP_REPLAY:
-            self.memory = Sum_tree_queue(buffer_size)
+        self.PRIORITIZED_EXP_REPLAY=self.param.PRIORITIZED_EXP_REPLAY
+        if self.param.PRIORITIZED_EXP_REPLAY:
+            self.memory = Sum_tree_queue(self.param.BUFFER_SIZE)
         else:
-            self.memory=deque(maxlen=buffer_size)
+            self.memory=deque(maxlen=self.param.BUFFER_SIZE)
         self.experience=namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-        self.batch_size = batch_size
+        self.batch_size = self.param.BATCH_SIZE
         self.seed = random.seed(seed)
         self.profile = profile
         self.cnt=0

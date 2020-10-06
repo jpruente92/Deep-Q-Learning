@@ -1,23 +1,21 @@
-from QLearning import start_agent_unity, start_agent_gym
+from Hyperparameter import Hyperparameters
+from Profile import Profile
+from QLearning import start_agent_unity, start_agent_gym, test_parameters
 
 # unity env
 problem_name_unity = "Banana"
 
-# start agent without profiling
-# start_agent_unity(problem_name_unity+"_DOUBLE_Q_",False,False,True)
+# starting the agent
+# start_agent_unity(problem_name_unity,Hyperparameters())
 
-# start agent with profiling from saved version
-start_agent_unity(problem_name_unity+"_DOUBLE_Q_",False,True,True)
+# testing parameters and save to file
+test_parameters("test.txt",problem_name_unity,True,Hyperparameters(),Profile(),[8,9,25],[8,9,25],[[True,False],[True,False],[[64,64],[64,64,64]]])
 
 # gym env
-# problem name
-# problem_name_gym='LunarLander-v2'
+problem_name_gym='LunarLander-v2'
+#start_agent_gym(problem_name_gym,Hyperparameters())
 
-# start agent without profiling
-# start_agent_gym(problem_name_gym+"_DOUBLE_Q_",False,False,True)
 
-# start agent with profiling from saved version
-# start_agent_gym(problem_name_gym+"_DOUBLE_Q_",False,True,True)
 
 
 
