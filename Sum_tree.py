@@ -6,8 +6,8 @@ from collections import deque
 # in the sum tree the elements are saved
 # in the queue the node are saved so that they can be removed when max size is reached
 class Sum_tree_queue():
-    def __init__(self,buffer_size):
-        self.sum_tree= Sum_tree()
+    def __init__(self,buffer_size,seed):
+        self.sum_tree= Sum_tree(seed)
         self.queue=deque(maxlen=buffer_size)
         self.max_size=buffer_size
 
@@ -25,11 +25,14 @@ class Sum_tree_queue():
 
 
 class Sum_tree():
-    def __init__(self):
+    def __init__(self,seed):
         self.root=None
+        random.seed(seed)
+
 
     # works for trees and sub trees
     def add(self,new_node):
+        new_node.father=None
         if self.root is None:
             self.root=new_node
             return
@@ -49,12 +52,14 @@ class Sum_tree():
                 father=father.right
         new_node.father=father
         # update sum and update_path_lengths of all ancestors
+        ancestor=father
         while True:
-            father.sum+=new_node.sum
-            father.update_path_lengths()
-            if(father.father is None):
+            ancestor.sum+=new_node.sum
+            ancestor.update_path_lengths()
+            if(ancestor.father is None):
                 break
-            father=father.father
+            ancestor=ancestor.father
+
 
     def add_new_value(self,value,priority,index):
         self.add(Sum_tree_element(value,priority,priority,None,None,None,index))
@@ -66,92 +71,118 @@ class Sum_tree():
         if self.root is node:
             if(node.left is None):
                 if (node.right is None):
+                    self.root=None
                     return
                 else:
                     self.root=node.right
+                    self.root.father=None
             else:
                 if (node.right is None):
-                    self.root=node.right
+                    self.root=node.left
+                    self.root.father=None
                 else:
-                    # tree with higher max path lengthwill be the root
+                    # tree with higher max path length will be the root
                     if(node.right.max_path_to_leaf>node.left.max_path_to_leaf):
                         self.root=node.right
+                        self.root.father=None
                         self.add(node.left)
                     else:
                         self.root=node.left
+                        self.root.father=None
                         self.add(node.right)
         else:
             father = node.father
             # delete node from father
-            if father.left is node:
+            if father.left is not None and father.left.index == node.index:
                 father.left=None
-            else:
+            elif father.right is not None and father.right.index == node.index:
                 father.right=None
+            else:
+                assert False
             # subtract sum from all ancestors of node and update path lengths
+            ancestor = father
             while True:
-                father.sum-=node.sum
-                father.update_path_lengths()
-                if(father.father is None):
+                ancestor.sum-=node.sum
+                ancestor.update_path_lengths()
+                if(ancestor.father is None):
                     break
-                father=father.father
+                ancestor=ancestor.father
             # add children to tree
             if(node.left is not None):
+                node.left.father=None
                 self.add(node.left)
             if(node.right is not None):
+                node.right.father=None
                 self.add(node.right)
 
-    def update_priority(self,node,priority):
-        diff = node.priority-priority
-        node.priority=priority
-        while node is not None:
-            node.sum-=diff
-            node=node.father
+    def update_priority(self,node,new_priority):
+        diff = node.priority-new_priority
+        node.priority=new_priority
+        current=node
+        while current is not None:
+            current.sum-=diff
+            current=current.father
 
 
     def sample_values(self,replace,batch_size):
-        random_number = random.random()
-        node =self.root
-        total_sum=self.root.sum
         nodes=[]
-        probabilities=[]
-        indices=[]
+        priorities=[]
         for x in range(batch_size):
+            random_number = random.random()
+            node =self.root
+            total_sum=self.root.sum
             while True:
                 sum_left=0
                 if(node.left is not None):
                     sum_left=node.left.sum
-                # if we replace or node s not drawn yet, we have to regard nothing
-                if(replace or not node.index in indices):
-                    if(node.left is not None and random_number<=sum_left/total_sum):
-                        node=node.left
-                    elif(node.right is not None and random_number>=(sum_left+node.priority)/total_sum):
-                        node=node.right
-                        random_number-=((sum_left+node.priority)/total_sum)
-                    else:
-                        nodes.append(node)
-                        probabilities.append(node.priority/total_sum)
-                        break
-                # otherwise the node has to be ignored
+                if(node.left is not None and random_number<=sum_left/total_sum):
+                    node=node.left
+                elif(node.right is not None and random_number>=(sum_left+node.priority)/total_sum):
+                    node=node.right
+                    random_number-=((sum_left+node.priority)/total_sum)
                 else:
-                    if(node.left is not None and random_number<=sum_left/total_sum):
-                        node=node.left
-                    else:
-                        node=node.right
-                        random_number-=((sum_left)/total_sum)
-                        # change probabilities according to the removal
-                        total_sum-=node.priority
-                        indices.append(node.index)
+                    nodes.append(node)
+                    priorities.append(node.priority)
+                    if not replace:
+                        self.remove(node)
+                    break
+        # add all nodes back to the tree
+        if not replace:
+            for node in nodes:
+                node.father=None
+                node.left=None
+                node.right=None
+                node.sum=node.priority
+                self.add(node)
+        # divide priorities with total sum to get the probability for a single draw
+        probabilities=[p/self.root.sum for p in priorities]
         return nodes,probabilities
 
+    def consistency_check(self,node):
+        if(self.root is node):
+            assert (node.father is None)
+        sum=node.priority
+        if(node.left is not None):
+            assert (node.left.father is node)
+            self.consistency_check(node.left)
+            sum+=node.left.sum
+        if(node.right is not None):
+            assert (node.right.father is node)
+            self.consistency_check(node.right)
+            sum+=node.right.sum
+        assert(abs(sum-node.sum)<0.01)
 
     def print(self,node):
+        string_father="-"
+        if(node.father is not None):
+            string_father=node.father.index
         string_left="-"
         if(node.left is not None):
             string_left=node.left.index
         string_right="-"
         if(node.right is not None):
             string_right=node.right.index
-        print("index: ",node.index,"\tleft child: ",string_left,"\tright child: ",string_right,"\tpriority: ",node.priority,"\tsum: ",node.sum,"\tmax_path_to_leaf: ",node.max_path_to_leaf)
+        print("index: ",node.index,"\tfather: ",string_father,"\tleft child: ",string_left,"\tright child: ",string_right,"\tpriority: ",node.priority,"\tsum: ",node.sum,"\tmax_path_to_leaf: ",node.max_path_to_leaf)
         if (node.left is not None):
             self.print(node.left)
         if (node.right is not None):

@@ -1,20 +1,20 @@
 from Hyperparameter import Hyperparameters
 from Profile import Profile
-from QLearning import start_agent_unity, start_agent_gym, test_parameters
+from QLearning import start_agent_unity, start_agent_gym
 
 
 # unity env
-problem_name_unity = "Banana"
+problem_name_unity = "Banana.exe"
 
 # starting the agent
-# start_agent_unity(problem_name_unity,Hyperparameters())
+start_agent_unity(problem_name_unity,Hyperparameters(),seed=0)
 
-# testing parameters and save to file
-test_parameters("test.txt",problem_name_unity,True,Hyperparameters(),Profile(),[8,9,25],[8,9,25],[[True,False],[True,False],[[64,64],[64,64,64]]])
 
 # gym env
 problem_name_gym='LunarLander-v2'
-#start_agent_gym(problem_name_gym,Hyperparameters())
+
+# starting the agent
+# start_agent_gym(problem_name_gym,Hyperparameters(),seed=0)
 
 
 

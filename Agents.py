@@ -1,4 +1,6 @@
 import time
+from builtins import print
+
 import numpy as np
 import random
 
@@ -24,7 +26,7 @@ def state_dim_to_int(state_dimension):
 
 
 # class for the agent
-class Agent_py_torch():
+class Agent():
 
     def __init__(self, state_shape, number_actions, filename_local, filename_target, seed, profile,param):
         self.param = param
@@ -32,7 +34,7 @@ class Agent_py_torch():
         self.profile=profile
         self.state_dimension = state_dimension
         self.number_actions = number_actions
-        self.seed = random.seed(seed)
+        random.seed(seed)
         self.max_priority=1000
         # use gpu if available else cpu
         self.device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -83,7 +85,7 @@ class Agent_py_torch():
             # compute q targets with target network and choose best action
             Q_targets_next=torch.tensor([self.qnetwork_target.evaluate(next_state,True)[int(next_action)] for next_action,next_state in zip(best_actions,next_states)]).unsqueeze(1)
         else:
-            Q_targets_next = self.qnetwork_target.evaluate(next_states,True).detach().max(1)[0].unsqueeze(1)
+            Q_targets_next = torch.tensor([self.qnetwork_target.evaluate(next_state,True).detach().max(1)[0].unsqueeze(1) for next_state in next_states])
         # Compute Q targets for current states
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
         # Get expected Q values from local model
@@ -97,6 +99,7 @@ class Agent_py_torch():
             for i, node in enumerate(samples):
                 # set priority of the given samples, small positive priority has to be guaranteed
                 priority=float(max(abs(td_errors[i]),0.01))
+                # print(td_errors[i],"\t",priority)
                 self.memory.memory.sum_tree.update_priority(node,priority)
                 # update max priority
                 self.max_priority=max(priority,self.max_priority)

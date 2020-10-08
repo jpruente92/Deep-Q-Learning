@@ -1,103 +1,41 @@
-import random
-import time
-from collections import deque
-from math import log2
+from builtins import print
+
+from Sum_tree import Sum_tree, Sum_tree_element
 import numpy as np
 
-from Sum_tree import Sum_tree_queue, Sum_tree
+np.random.seed(0)
+tree =Sum_tree(0)
+values = [np.random.randint(100) for i in range(1000)]
+priorities = [np.random.randint(100) for i in range(1000)]
 
+cnt=0
+nodes=[]
+for v,p in zip(values,priorities):
+    node= Sum_tree_element(v,p,p,None,None,None,cnt)
+    tree.add(node)
+    nodes.append(node)
+    cnt+=1
 
-# buffer_size=1000
-# my_tree_queue = Sum_tree_queue(buffer_size=buffer_size)
-# for i in range(20*buffer_size):
-#     my_tree_queue.add_new_value(i,i,i)
-#
-# print(log2(buffer_size))
-# my_tree_queue.sum_tree.print(my_tree_queue.sum_tree.root)
+print("sum before\t",tree.root.sum)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+batch,probs=tree.sample_values(False, 100)
+values_batch=[node.value for node in batch]
+print("values",values)
+print("values batch",values_batch)
+print ("probs\t",probs)
+print("sum of probs\t",np.sum(probs))
+print("sum after\t",tree.root.sum)
+for node,val in zip(nodes,values):
+    tree.update_priority(node,val+1)
 
-def sample_double_2(values,probs,batch_size):
-    return random.choices(population=values,weights=probs,k=batch_size)
-
-def sample_double(values,probs,batch_size):
-    draw = np.random.choice(len(values), batch_size,replace=True,p=probs)
-    sample=[values[i] for i in draw]
-    return sample
-
-def sample_no_double(values,probs,batch_size):
-    draw = np.random.choice(len(values), batch_size,replace=False,p=probs)
-    sample=[values[i] for i in draw]
-    return sample
-
-def sample_tree_double(tree,batch_size):
-    return tree.sample_values(True,batch_size)
-
-def sample_tree_no_double(tree,batch_size):
-    return tree.sample_values(False,batch_size)
-
-def compute_sample_probs(values,samples):
-    cnt=np.zeros(len(values))
-    for s in samples:
-        for i,v in enumerate(values):
-            if(s == v):
-                cnt[i]+=1.0
-                break
-    cnt/=float(len(samples))
-    return cnt
-
-size =200000
-batch_size=5
-nr_loops=100
-
-start_time=time.time()
-
-values=np.array([np.random.random() for x in range(size)])
-priorities=np.array([np.random.randint(0,101) for x in range(size)])
-print("building list:",(time.time()-start_time))
-
-start_time=time.time()
-
-tree=Sum_tree()
-for x in range(size):
-    tree.add_new_value(value=values[x],priority=priorities[x],index=x)
-print("building tree:",(time.time()-start_time))
-
-
-total_sum=tree.root.sum
-probs=priorities/total_sum
+tree.print(tree.root)
+tree.consistency_check(tree.root)
 
 
 
-start_time=time.time()
-all_samples=[]
-for x in range(nr_loops):
-    all_samples=[*all_samples,*sample_no_double(values,probs,batch_size)]
-print("np no double:",(time.time()-start_time))
-# print("\t",compute_sample_probs(values,all_samples))
-
-start_time=time.time()
-all_samples=[]
-for x in range(nr_loops):
-    all_samples=[*all_samples,*sample_tree_no_double(tree,batch_size)]
-print("tree no double:",(time.time()-start_time))
-# print("\t",compute_sample_probs(values,all_samples))
-
-start_time=time.time()
-all_samples=[]
-for x in range(nr_loops):
-    all_samples=[*all_samples,*sample_double(values,probs,batch_size)]
-print("np double:",(time.time()-start_time))
-# print("\t",compute_sample_probs(values,all_samples))
-
-start_time=time.time()
-all_samples=[]
-for x in range(nr_loops):
-    all_samples=[*all_samples,*sample_tree_double(tree,batch_size)]
-print("tree double:",(time.time()-start_time))
-# print("\t",compute_sample_probs(values,all_samples))
-
-start_time=time.time()
-all_samples=[]
-for x in range(nr_loops):
-    all_samples=[*all_samples,*sample_double_2(values,probs,batch_size)]
-print("random double:",(time.time()-start_time))
-# print("\t",compute_sample_probs(values,all_samples))
