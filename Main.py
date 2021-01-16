@@ -1,23 +1,14 @@
-from Hyperparameter import Hyperparameters
-from Profile import Profile
-from QLearning import start_agent_unity, start_agent_gym
+from Environment import environment
+from QLearning import *
 
+# modifying the environment
+problem_name = "Banana.exe"
+type = "unity"
 
-# unity env
-problem_name_unity = "Banana.exe"
-
-# starting the agent
-start_agent_unity(problem_name_unity,Hyperparameters(),seed=0)
-
-
-# gym env
-problem_name_gym='LunarLander-v2'
+# problem_name = 'LunarLander-v2'
+# type = "gym"
+seed = 0
+env = environment(type, problem_name, seed)
 
 # starting the agent
-# start_agent_gym(problem_name_gym,Hyperparameters(),seed=0)
-
-
-
-
-
-
+start_agent(env, seed)

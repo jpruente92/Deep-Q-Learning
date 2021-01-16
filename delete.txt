@@ -1,0 +1,37 @@
+lunar
+
+priority is loss, loss is sl1
+Episode 100	Average Score: -130.17
+Episode 200	Average Score: -70.43
+Episode 300	Average Score: -5.72
+Episode 400	Average Score: 47.90
+Episode 500	Average Score: 39.88
+Episode 600	Average Score: 84.53
+Episode 700	Average Score: 89.90
+Episode 800	Average Score: 53.30
+Episode 900	Average Score: 36.35
+Episode 1000	Average Score: 10.39
+Episode 1100	Average Score: -27.52
+Episode 1200	Average Score: -26.75
+Episode 1300	Average Score: 16.01
+Episode 1340	Average Score: 33.01
+
+priority is td error, loss is sl1
+Episode 100	Average Score: -127.97
+Episode 200	Average Score: -69.71
+Episode 300	Average Score: 14.32
+Episode 400	Average Score: 49.58
+Episode 500	Average Score: 47.11
+Episode 600	Average Score: 55.10
+Episode 700	Average Score: 57.33
+Episode 800	Average Score: 63.11
+Episode 900	Average Score: 112.25
+Episode 1000	Average Score: 91.09
+Episode 1100	Average Score: 135.36
+Episode 1200	Average Score: 137.14
+Episode 1300	Average Score: 123.45
+Episode 1356	Average Score: 202.25
+Environment solved in 1256 episodes!	Average Score: 202.25
+Time for learning: 4555.135230302811
+
+unity

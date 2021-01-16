@@ -54,27 +54,26 @@ here for global use
 
     
 ### Hyperparameters:
-The following list shows the hyperparameters chosen for learning. For more details see file "Hyperparameter.py".
-- LOAD = False            
-- FILENAME_FOR_LOADING="Banana"  
-- SAVE = True             
-- FILENAME_FOR_SAVING="Banana"  
-- PLOT = True           
-- PLOTNAME = "BANANA_Scores.png" 
-- WITH_PROFILING = False  
-- ENV_TRAIN = True       
-- VAL_ENV_SOLVED = 13.0   
+The following list shows the hyperparameters chosen for learning in the best version. For more details see file "Hyperparameter.py".
+-LOAD = False            
+-FILENAME_FOR_LOADING="Banana_pexpr"  
+-SAVE = True          
+-FILENAME_FOR_SAVING="Banana_pexpr"  
+-PLOT = True       
+-PLOTNAME = "BANANA_Scores_pexpr.png"
+-WITH_PROFILING = False  
+-ENV_TRAIN = True       
+-VAL_ENV_SOLVED = 13.0    
 - SOFT_UPDATE = True      
 - DOUBLE_Q= True         
-- PRIORITIZED_EXP_REPLAY= False          
+- PRIORITIZED_EXP_REPLAY= True
+- DUELING_NETWORK = False            
 - NR_EPISODES=2000
 - MAX_NR_STEPS=1000
 - EPS_START=1.00
 - EPS_END=0.01
 - EPS_DECAY=0.995
 - B_START=0.4
-- B_END=1.00
-- B_INCREASE=1.005
 - A=0.6                   
 - BUFFER_SIZE = 10000    
 - BATCH_SIZE = 64         
@@ -86,10 +85,6 @@ The following list shows the hyperparameters chosen for learning. For more detai
 - hidden_layers=[64,64]
 
 
-### Neural Network Architecture:
-The neural networks used by the trained algorithm consist of an input layer with 37 neurons, two linear hidden layers with 64 neurons and an output layer with 4 neurons. Before the hidden layers and the output layer a relu activation function is used.
-
-
 ### Results:
 The following figure displays the score of the agent during the learning process over 625 episodes, each consisting of at most 1000 steps. The average score per episode in the episodes 525-625 is 13.0 and therefore the environment is considered solved after 525 episodes. 
 ![alt text](./BANANA_Scores.png)
@@ -98,15 +93,12 @@ The following figure displays the score of the agent during the learning process
 
 ### Observations:
 - Double Q Learning reduces the number of learning steps, but increases the running time
-- ***my implementation of the algorithm with a prioritized replay buffer does not work well. 
- It is not able to solve the Bananas environment because it gets stuck at an average score of 9 to 10 and for LunarLander it even becomes worse during 
- the learning process. Please review the relevant passages (file "Agent.py" lines 96-117 and 151-152, file "Replay_buffer.py" lines 26-28 and 35-36, file "Sum_tree.py") and tell me my mistake. I am quite sure that the Sum_tree class is not the problem. I assume that the max_importance_sampling_weight
- inside the function "learn" in file "Agent.py" is not correct.***
+- Prioritized experience replay increases the running time but is not always beneficial e.g. for LunarLander it does not perform well. For the Banana environment it educes the number of learning steps 
 
 
 ### Future Improvements:
-- include ideas from the paper "Dueling Network Architectures for Deep Reinforcement Learning" by Wang et al.
 - include ideas from the paper "NOISY NETWORKS FOR EXPLORATION" by Fortunato et al.
+- include other ideas from the paper "Rainbow: Combining Improvements in Deep Reinforcement Learning" by Hessel et al.
 - convolutional layers might the improve agent
     
     
