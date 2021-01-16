@@ -18,71 +18,7 @@
  After an experience is used, the priority is updated to the absolute value of the TD-error.
 
 
-
-
-### Structure
-- file "Agents.py" contains the Agent class that defines an agent of the reinforcement problem and contains the following functions
-    - "init" : initializing the agent
-    - "step" : saving the data of the environment in the replay buffer and learn afterwards
-    - "act" : returns the action for a given state following the epsilon-greedy policy
-    - "learn" : updates the neural networks
-    - "soft_update" : updates the target network with a soft update
-    - "hard_update" : updates the target network by copying all values from the local network
-    - "samples_to_environment_values" : extracts environment data from a set of samples of elements of the replay buffer
-- file "Hyperparameter.py" contains the hyperparameter class. All hyperparameters and settings for the algorithm cab be set
-here for global use 
-- file "Main.py" is for starting the program
-- file "Neural_networks.py" contains the QNetwork class that defines the deep neural networks that computes q values from states and contains the following functions:
-    - "init" : initializing the network
-    - "forward" : defines order of layers and activation functions
-    - "evaluate" : outputs the action values for a given state
-    - "save" : saves state_dict to file
-- in the file "QLearning.py" the Q learning algorithm is implemented. It contains the following methods:
-    - "profiling": outputs times for the most time consuming tasks
-    - "dqn_gym": deep q learning algorithm for the gym environment
-    - "dqn_unity": deep q learning algorithm for the unity environment
-    - "start_agent_unity": starting the unity environment, creating an agent and start algorithm
-    - "start_agent_gym": starting the gym environment, creating an agent and start algorithm
-- file "Profile.py" contains the Profile class, in which different statistics are saved
-- file "Replay_buffer.py" contains the class ReplayBuffer, in which memories about observed (state, action,next state, reward, done) quintuples are stored. It contains the following methods
-    - "init": initializes a new Replay buffer
-    - "add": add memory to replay buffer
-    - "sample": samples a batch of experiences from the Replay buffer
-    - "len": returns the length of the Replay buffer
-- file "Sum_tree.py" contains the classes Sum_tree_queue, Sum_tree and Sum_tree_element that are used if the prioritized replay buffer is active
-- file "Test.py" contains a test for the Sum_tree data structure
-
     
-### Hyperparameters:
-The following list shows the hyperparameters chosen for learning in the best version. For more details see file "Hyperparameter.py".
--LOAD = False            
--FILENAME_FOR_LOADING="Banana_pexpr"  
--SAVE = True          
--FILENAME_FOR_SAVING="Banana_pexpr"  
--PLOT = True       
--PLOTNAME = "BANANA_Scores_pexpr.png"
--WITH_PROFILING = False  
--ENV_TRAIN = True       
--VAL_ENV_SOLVED = 13.0    
-- SOFT_UPDATE = True      
-- DOUBLE_Q= True         
-- PRIORITIZED_EXP_REPLAY= True
-- DUELING_NETWORK = False            
-- NR_EPISODES=2000
-- MAX_NR_STEPS=1000
-- EPS_START=1.00
-- EPS_END=0.01
-- EPS_DECAY=0.995
-- B_START=0.4
-- A=0.6                   
-- BUFFER_SIZE = 10000    
-- BATCH_SIZE = 64         
-- GAMMA = 0.99            
-- TAU = 0.001             
-- LR = 0.0005             
-- UPDATE_EVERY = 4        
-- UPDATE_TARGET_EVERY = 20 
-- hidden_layers=[64,64]
 
 
 ### Results:
@@ -99,7 +35,6 @@ The following figure displays the score of the agent during the learning process
 ### Future Improvements:
 - include ideas from the paper "NOISY NETWORKS FOR EXPLORATION" by Fortunato et al.
 - include other ideas from the paper "Rainbow: Combining Improvements in Deep Reinforcement Learning" by Hessel et al.
-- convolutional layers might the improve agent
     
     
 
