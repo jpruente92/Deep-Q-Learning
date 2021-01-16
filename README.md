@@ -1,4 +1,4 @@
-# RL_class_project_1
+# Deep Q-Learning
 
 This project is an implementation of a Q-learning algorithm for solving unity or gym environments.
 
